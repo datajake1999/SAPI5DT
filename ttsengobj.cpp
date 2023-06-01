@@ -98,15 +98,14 @@ void CTTSEngObj::callback(LONG LParam1, LONG lParam2, DWORD user, UINT msg)
 	{
 		return;
 	}
-	if(SAPI->m_OutputSite->GetActions() & SPVES_ABORT)
-	{
-		LPTTS_BUFFER_T buffer = (LPTTS_BUFFER_T)lParam2;
-		TextToSpeechAddBuffer(SAPI->engine, buffer);
-		return;
-	}
 	if(msg == SAPI->BufferMessage)
 	{
 		LPTTS_BUFFER_T buffer = (LPTTS_BUFFER_T)lParam2;
+		if(SAPI->m_OutputSite->GetActions() & SPVES_ABORT)
+		{
+			TextToSpeechAddBuffer(SAPI->engine, buffer);
+			return;
+		}
 		for(DWORD i = 0; i < buffer->dwBufferLength/sizeof(short); i++)
 		{
 			double dsamp = SAPI->samples[i] / 32768.0;
@@ -149,6 +148,10 @@ HRESULT CTTSEngObj::FinalConstruct()
 
 	//Set up buffer
 	BufferMessage = RegisterWindowMessage("DECtalkBufferMessage");
+	if(!BufferMessage)
+	{
+		return hr;
+	}
 	buffer.lpData = (LPSTR)samples;
 	buffer.dwMaximumBufferLength = sizeof(samples);
 	TextToSpeechOpenInMemory(engine, WAVE_FORMAT_1M16);
@@ -338,6 +341,7 @@ ISpTTSEngineSite* pOutputSite )
 			if( pOutputSite->GetActions() & SPVES_ABORT )
 			{
 				TextToSpeechReset(engine, FALSE);
+				m_OutputSite = NULL;
 				return hr;
 			}
 
@@ -414,7 +418,7 @@ ISpTTSEngineSite* pOutputSite )
 						free(text2speak);
 					}
 					//Hack for the shark, which sends each word as It's own fragment!
-					TextToSpeechSpeak(engine, " ", TTS_NORMAL);
+					TextToSpeechSpeak(engine, "\n", TTS_NORMAL);
 					break;
 				}
 
@@ -437,7 +441,7 @@ ISpTTSEngineSite* pOutputSite )
 						free(text2speak);
 					}
 					//Hack for the shark, which sends each word as It's own fragment!
-					TextToSpeechSpeak(engine, " ", TTS_NORMAL);
+					TextToSpeechSpeak(engine, "\n", TTS_NORMAL);
 					break;
 				}
 
@@ -456,7 +460,7 @@ ISpTTSEngineSite* pOutputSite )
 				{
 					//--- The bookmark is NOT a null terminated string in the Item, but we need
 					//--- to convert it to one.  Allocate enough space for the string.
-					WCHAR * pszBookmark = (WCHAR *)_alloca((pTextFragList->ulTextLen + 1) * sizeof(WCHAR));
+					WCHAR * pszBookmark = (WCHAR *)malloc((pTextFragList->ulTextLen + 1) * sizeof(WCHAR));
 					memcpy(pszBookmark, pTextFragList->pTextStart, pTextFragList->ulTextLen * sizeof(WCHAR));
 					pszBookmark[pTextFragList->ulTextLen] = 0;
 					//--- Queue the event
@@ -467,6 +471,7 @@ ISpTTSEngineSite* pOutputSite )
 					Event.lParam               = (LPARAM)pszBookmark;
 					Event.wParam               = _wtol(pszBookmark);
 					hr = pOutputSite->AddEvents( &Event, 1 );
+					free(pszBookmark);
 					break;
 				}
 
@@ -480,7 +485,6 @@ ISpTTSEngineSite* pOutputSite )
 		//Wait for synthesis to complete
 		TextToSpeechSync(engine);
 
-		//Set m_OutputSite to NULL so the callback doesn't do anything outside the loop
 		m_OutputSite = NULL;
 
 		//--- S_FALSE just says that we hit the end, return okay

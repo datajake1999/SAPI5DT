@@ -85,7 +85,7 @@ private:
 	//Output buffer
 	UINT BufferMessage;
 	TTS_BUFFER_T buffer;
-	short samples[32768];
+	short samples[65536];
 
 	//DECtalk callback
 	static void callback(LONG LParam1, LONG lParam2, DWORD user, UINT msg);
