@@ -178,9 +178,10 @@ HRESULT CTTSEngObj::FinalConstruct()
 void CTTSEngObj::FinalRelease()
 {
 
-	//Shutdown DECtalk
+	//Reset and shutdown DECtalk
 	if(engine)
 	{
+		TextToSpeechReset(engine, TRUE);
 		TextToSpeechUnloadUserDictionary(engine);
 		TextToSpeechCloseInMemory(engine);
 		TextToSpeechShutdown(engine);
@@ -219,12 +220,14 @@ STDMETHODIMP CTTSEngObj::SetObjectToken(ISpObjectToken * pToken)
 			return hr;
 		}
 		//Set default settings
-		m_voice = 0;
-		m_rate = 180;
+		TextToSpeechGetSpeaker(engine, &m_voice);
+		TextToSpeechGetRate(engine, &m_rate);
+		TextToSpeechGetLanguage(engine, &m_language);
 
 		//Load settings from the token
 		m_cpToken->GetDWORD( L"Voice", &m_voice);
 		m_cpToken->GetDWORD( L"Rate", &m_rate);
+		m_cpToken->GetDWORD( L"Language", &m_language);
 
 		//Check if we are in a valid range for m_voice
 		if(m_voice > WENDY)
@@ -251,6 +254,9 @@ STDMETHODIMP CTTSEngObj::SetObjectToken(ISpObjectToken * pToken)
 
 		//Set default rate
 		TextToSpeechSetRate(engine, m_rate);
+
+		//Set default language
+		TextToSpeechSetLanguage(engine, m_language);
 
 		//Load a user dictionary
 		WCHAR *filename = NULL;
@@ -461,17 +467,20 @@ ISpTTSEngineSite* pOutputSite )
 					//--- The bookmark is NOT a null terminated string in the Item, but we need
 					//--- to convert it to one.  Allocate enough space for the string.
 					WCHAR * pszBookmark = (WCHAR *)malloc((pTextFragList->ulTextLen + 1) * sizeof(WCHAR));
-					memcpy(pszBookmark, pTextFragList->pTextStart, pTextFragList->ulTextLen * sizeof(WCHAR));
-					pszBookmark[pTextFragList->ulTextLen] = 0;
-					//--- Queue the event
-					SPEVENT Event;
-					Event.eEventId             = SPEI_TTS_BOOKMARK;
-					Event.elParamType          = SPET_LPARAM_IS_STRING;
-					Event.ullAudioStreamOffset = 0;
-					Event.lParam               = (LPARAM)pszBookmark;
-					Event.wParam               = _wtol(pszBookmark);
-					hr = pOutputSite->AddEvents( &Event, 1 );
-					free(pszBookmark);
+					if (pszBookmark)
+					{
+						memcpy(pszBookmark, pTextFragList->pTextStart, pTextFragList->ulTextLen * sizeof(WCHAR));
+						pszBookmark[pTextFragList->ulTextLen] = 0;
+						//--- Queue the event
+						SPEVENT Event;
+						Event.eEventId             = SPEI_TTS_BOOKMARK;
+						Event.elParamType          = SPET_LPARAM_IS_STRING;
+						Event.ullAudioStreamOffset = 0;
+						Event.lParam               = (LPARAM)pszBookmark;
+						Event.wParam               = _wtol(pszBookmark);
+						hr = pOutputSite->AddEvents( &Event, 1 );
+						free(pszBookmark);
+					}
 					break;
 				}
 

@@ -93,6 +93,7 @@ private:
 	//DECtalk settings
 	DWORD m_voice;
 	DWORD m_rate;
+	DWORD m_language;
 
 	//Volume hack
 	double gain;
