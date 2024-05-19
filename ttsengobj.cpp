@@ -106,14 +106,15 @@ void CTTSEngObj::callback(LONG LParam1, LONG lParam2, DWORD user, UINT msg)
 			TextToSpeechAddBuffer(SAPI->engine, buffer);
 			return;
 		}
+		short *samples = (short *)buffer->lpData;
 		for(DWORD i = 0; i < buffer->dwBufferLength/sizeof(short); i++)
 		{
-			double dsamp = SAPI->samples[i] / 32768.0;
+			double dsamp = samples[i] / 32768.0;
 			dsamp = dsamp * SAPI->gain;
 			dsamp = dsamp * 32768.0;
-			SAPI->samples[i] = (short)dsamp;
+			samples[i] = (short)dsamp;
 		}
-		SAPI->m_OutputSite->Write(SAPI->samples, buffer->dwBufferLength, NULL);
+		SAPI->m_OutputSite->Write(buffer->lpData, buffer->dwBufferLength, NULL);
 		TextToSpeechAddBuffer(SAPI->engine, buffer);
 	}
 }
@@ -132,7 +133,7 @@ HRESULT CTTSEngObj::FinalConstruct()
 	engine = NULL;
 
 	memset(&caps, 0, sizeof(caps));
-	memset(&buffer, 0, sizeof(buffer));
+	memset(buffer, 0, sizeof(buffer));
 	memset(samples, 0, sizeof(samples));
 
 	//Get some Info about the engine
@@ -146,16 +147,26 @@ HRESULT CTTSEngObj::FinalConstruct()
 		return hr;
 	}
 
-	//Set up buffer
+	//Register buffer message
 	BufferMessage = RegisterWindowMessage("DECtalkBufferMessage");
 	if(!BufferMessage)
 	{
 		return hr;
 	}
-	buffer.lpData = (LPSTR)samples;
-	buffer.dwMaximumBufferLength = sizeof(samples);
-	TextToSpeechOpenInMemory(engine, WAVE_FORMAT_1M16);
-	TextToSpeechAddBuffer(engine, &buffer);
+
+	//Set the synth to output audio to memory buffers
+	if (TextToSpeechOpenInMemory(engine, WAVE_FORMAT_1M16))
+	{
+		return hr;
+	}
+
+	//Set up buffers
+	for (int i = 0; i < NUMBUFFERS; i++)
+	{
+		buffer[i].lpData = (LPSTR)samples[i];
+		buffer[i].dwMaximumBufferLength = BUFFERSIZE*2;
+		TextToSpeechAddBuffer(engine, &buffer[i]);
+	}
 
 	//Enable phonemic Input, the silence and emphasis tags use this
 	TextToSpeechSpeak(engine, "[:phone on]", TTS_NORMAL);

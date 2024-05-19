@@ -26,6 +26,9 @@
 
 #include "resource.h"
 
+#define NUMBUFFERS 8
+#define BUFFERSIZE 1024
+
 /*** CTTSEngObj COM object ********************************
 */
 class ATL_NO_VTABLE CTTSEngObj : 
@@ -84,8 +87,8 @@ private:
 
 	//Output buffer
 	UINT BufferMessage;
-	TTS_BUFFER_T buffer;
-	short samples[65536];
+	TTS_BUFFER_T buffer[NUMBUFFERS];
+	short samples[BUFFERSIZE][NUMBUFFERS];
 
 	//DECtalk callback
 	static void callback(LONG LParam1, LONG lParam2, DWORD user, UINT msg);
